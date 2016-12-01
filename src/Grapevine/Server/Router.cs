@@ -535,6 +535,7 @@ namespace Grapevine.Server
 
             try
             {
+                // TODO: Check for public folder
                 Route(context, RoutesFor(context));
             }
             catch (RouteNotFoundException rnf)

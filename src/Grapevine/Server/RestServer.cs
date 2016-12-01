@@ -71,6 +71,7 @@ namespace Grapevine.Server
         public Action OnAfterStart { get; set; }
         public Action OnBeforeStop { get; set; }
         public Action OnAfterStop { get; set; }
+        public IList<IPublicFolder> PublicFolders { get; }
         public IRouter Router { get; set; }
 
         public RestServer() : this(new ServerSettings()) { }
@@ -85,18 +86,18 @@ namespace Grapevine.Server
         {
             Listener = new HttpListener(new System.Net.HttpListener());
             Listening = new Thread(HandleRequests);
-            //ReadyEvent = new ManualResetEvent(false);
             StopEvent = new ManualResetEvent(false);
 
             options.CloneEventHandlers(this);
             Host = options.Host;
             Logger = options.Logger;
             Port = options.Port;
-            PublicFolder = options.PublicFolder;
+            PublicFolders = options.PublicFolders;
             Router = options.Router;
             UseHttps = options.UseHttps;
 
             /* Obsolete */
+            PublicFolder = options.PublicFolder;
             Connections = options.Connections;
             OnBeforeStart = options.OnBeforeStart;
             OnAfterStart = options.OnAfterStart;

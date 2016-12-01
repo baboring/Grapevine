@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using Grapevine.Interfaces.Shared;
 using Grapevine.Shared.Loggers;
@@ -94,7 +96,13 @@ namespace Grapevine.Server
         /// <summary>
         /// Gets the PublicFolder object to use for serving static content
         /// </summary>
+        [Obsolete("The PublicFolder property has been deprecated and will be removed in the next version.")]
         IPublicFolder PublicFolder { get; }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        IList<IPublicFolder> PublicFolders { get; }
 
         /// <summary>
         /// Gets or sets the instance of IRouter to be used by this server to route incoming HTTP requests
@@ -152,11 +160,13 @@ namespace Grapevine.Server
 
         public IGrapevineLogger Logger { get; set; }
         public IPublicFolder PublicFolder { get; }
+        public IList<IPublicFolder> PublicFolders { get; }
 
         public IRouter Router { get; set; }
 
         public ServerSettings()
         {
+            PublicFolders = new List<IPublicFolder>();
             Connections = 50;
             Host = "localhost";
             Logger = NullLogger.GetInstance();
