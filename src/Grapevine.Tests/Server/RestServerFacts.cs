@@ -37,7 +37,9 @@ namespace Grapevine.Tests.Server
                     server.OnStart.ShouldBeNull();
                     server.OnStop.ShouldBeNull();
                     server.Port.ShouldBe("1234");
-                    server.PublicFolder.ShouldBeOfType<PublicFolder>();
+                    server.PublicFolders.Any().ShouldBeFalse();
+                    server.PublicFolder.ShouldNotBeNull();
+                    server.PublicFolders.Any().ShouldBeTrue();
                     server.Router.ShouldBeOfType<Router>();
                     server.UseHttps.ShouldBeFalse();
                 }
@@ -52,7 +54,7 @@ namespace Grapevine.Tests.Server
                 using (var server = RestServer.For(_ =>
                 {
                     _.Port = port;
-                    _.PublicFolder.DefaultFileName = index;
+                    _.PublicFolder = new PublicFolder { DefaultFileName = index};
                 }))
                 {
                     server.Port.ShouldBe(port);

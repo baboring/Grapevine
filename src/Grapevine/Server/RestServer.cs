@@ -97,7 +97,6 @@ namespace Grapevine.Server
             UseHttps = options.UseHttps;
 
             /* Obsolete */
-            PublicFolder = options.PublicFolder;
             Connections = options.Connections;
             OnBeforeStart = options.OnBeforeStart;
             OnAfterStart = options.OnAfterStart;
@@ -173,7 +172,24 @@ namespace Grapevine.Server
             }
         }
 
-        public IPublicFolder PublicFolder { get; }
+        public IPublicFolder PublicFolder
+        {
+            get
+            {
+                if (!PublicFolders.Any()) PublicFolders.Add(new PublicFolder());
+                return PublicFolders.First();
+            }
+            set
+            {
+                if (value == null) return;
+                if (PublicFolders.Any())
+                {
+                    PublicFolders[0] = value;
+                    return;
+                }
+                PublicFolders.Add(value);
+            }
+        }
 
         public bool UseHttps
         {

@@ -531,36 +531,41 @@ namespace Grapevine.Server
             var context = state as IHttpContext;
             if (context == null) return;
 
-            var server = context.Server;
-
             try
             {
-                // TODO: Check for public folder
+                if (context.Request.HttpMethod == HttpMethod.GET)
+                {
+                    foreach (var folder in context.Server.PublicFolders)
+                    {
+                        folder.SendFile(context);
+                        if (context.WasRespondedTo) return;
+                    }
+                }
+
                 Route(context, RoutesFor(context));
             }
-            catch (RouteNotFoundException rnf)
+            catch (NotFoundException notfound)
             {
-                Logger.Log(new LogEvent {Exception = rnf, Level = LogLevel.Error, Message = rnf.Message});
-                if (server.EnableThrowingExceptions) throw;
-                context.Response.SendResponse(HttpStatusCode.NotFound);
+                Logger.Log(new LogEvent {Exception = notfound, Level = LogLevel.Error, Message = notfound.Message});
+                if (context.Server.EnableThrowingExceptions) throw;
+                context.Response.SendResponse(HttpStatusCode.NotFound, notfound.Message);
             }
             catch (NotImplementedException ni)
             {
                 Logger.Log(new LogEvent { Exception = ni, Level = LogLevel.Error, Message = ni.Message });
-                if (server.EnableThrowingExceptions) throw;
+                if (context.Server.EnableThrowingExceptions) throw;
                 context.Response.SendResponse(HttpStatusCode.NotImplemented);
             }
             catch (Exception e)
             {
                 Logger.Log(new LogEvent { Exception = e, Level = LogLevel.Error, Message = e.Message });
-                if (server.EnableThrowingExceptions) throw;
+                if (context.Server.EnableThrowingExceptions) throw;
                 context.Response.SendResponse(HttpStatusCode.InternalServerError, e);
             }
         }
 
         public void Route(IHttpContext context, IList<IRoute> routing)
         {
-            if (context.WasRespondedTo) return;
             if (routing == null || !routing.Any()) throw new RouteNotFoundException(context);
             var totalRoutes = routing.Count;
             var routeCounter = 0;

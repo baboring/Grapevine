@@ -94,13 +94,12 @@ namespace Grapevine.Server
         string Port { get; set; }
 
         /// <summary>
-        /// Gets the PublicFolder object to use for serving static content
+        /// Gets the default PublicFolder object to use for serving static content
         /// </summary>
-        [Obsolete("The PublicFolder property has been deprecated and will be removed in the next version.")]
         IPublicFolder PublicFolder { get; }
 
         /// <summary>
-        /// 
+        /// Gets the list of all PublicFolder objects used for serving static content
         /// </summary>
         IList<IPublicFolder> PublicFolders { get; }
 
@@ -159,7 +158,6 @@ namespace Grapevine.Server
         public bool UseHttps { get; set; }
 
         public IGrapevineLogger Logger { get; set; }
-        public IPublicFolder PublicFolder { get; }
         public IList<IPublicFolder> PublicFolders { get; }
 
         public IRouter Router { get; set; }
@@ -171,9 +169,27 @@ namespace Grapevine.Server
             Host = "localhost";
             Logger = NullLogger.GetInstance();
             Port = "1234";
-            PublicFolder = new PublicFolder();
             Router = new Router();
             UseHttps = false;
+        }
+
+        public IPublicFolder PublicFolder
+        {
+            get
+            {
+                if (!PublicFolders.Any()) PublicFolders.Add(new PublicFolder());
+                return PublicFolders.First();
+            }
+            set
+            {
+                if (value == null) return;
+                if (PublicFolders.Any())
+                {
+                    PublicFolders[0] = value;
+                    return;
+                }
+                PublicFolders.Add(value);
+            }
         }
 
         public void CloneEventHandlers(IRestServer server)

@@ -50,23 +50,9 @@ namespace Grapevine.Tests.Server
             public void CreatesFolderIfNotExists()
             {
                 var folder = GenerateUniqueString();
-                var root = new PublicFolder { FolderPath = folder };
+                var root = new PublicFolder(folder);
                 root.FolderPath.Equals(Path.Combine(Directory.GetCurrentDirectory(), folder)).ShouldBe(true);
                 CleanUp(root.FolderPath);
-            }
-
-            [Fact]
-            public void ThrowsExceptionWhenSetToEmpty()
-            {
-                var root = new PublicFolder();
-                Should.Throw<ArgumentException>(() => root.FolderPath = string.Empty);
-            }
-
-            [Fact]
-            public void ThrowsExceptionWhenSetToNull()
-            {
-                var root = new PublicFolder();
-                Should.Throw<ArgumentNullException>(() => root.FolderPath = null);
             }
         }
 
@@ -199,7 +185,7 @@ namespace Grapevine.Tests.Server
                 var context = Mocks.HttpContext(properties);
                 var root = new PublicFolder();
 
-                root.RespondWithFile(context);
+                root.SendFile(context);
 
                 context.Response.DidNotReceiveWithAnyArgs().SendResponse(HttpStatusCode.Ok);
             }
@@ -211,7 +197,7 @@ namespace Grapevine.Tests.Server
                 var context = Mocks.HttpContext(properties);
                 var root = new PublicFolder { Prefix = "test" };
 
-                root.RespondWithFile(context);
+                root.SendFile(context);
 
                 context.Response.DidNotReceiveWithAnyArgs().SendResponse(HttpStatusCode.Ok);
             }
@@ -223,7 +209,7 @@ namespace Grapevine.Tests.Server
                 var context = Mocks.HttpContext(properties);
                 var root = new PublicFolder();
 
-                root.RespondWithFile(context);
+                root.SendFile(context);
 
                 context.Response.DidNotReceiveWithAnyArgs().SendResponse(HttpStatusCode.Ok);
             }
@@ -244,7 +230,7 @@ namespace Grapevine.Tests.Server
                 var filepath = Path.Combine(folderpath, root.DefaultFileName);
                 using (var sw = File.CreateText(filepath)) { sw.WriteLine("Hello"); }
 
-                root.RespondWithFile(context);
+                root.SendFile(context);
                 context.Response.Received().SendResponse(filepath, true);
 
                 CleanUp(root.FolderPath);
@@ -267,36 +253,10 @@ namespace Grapevine.Tests.Server
                 var filepath = Path.Combine(folderpath, root.DefaultFileName);
                 using (var sw = File.CreateText(filepath)) { sw.WriteLine("Hello"); }
 
-                root.RespondWithFile(context);
+                root.SendFile(context);
                 context.Response.Received().SendResponse(filepath, true);
 
                 CleanUp(root.FolderPath);
-            }
-        }
-
-        public class ShouldRespondWithFileMethod
-        {
-            [Fact]
-            public void ReturnsFalseWhenPrefixIsEmpty()
-            {
-                var root = new PublicFolder();
-                root.ShouldRespondWithFile(Mocks.HttpContext()).ShouldBeFalse();
-            }
-
-            [Fact]
-            public void ReturnsFalseWhenPathInfoDoesNotStartWithPrefix()
-            {
-                var root = new PublicFolder {Prefix = "prefix"};
-                root.ShouldRespondWithFile(Mocks.HttpContext()).ShouldBeFalse();
-            }
-
-            [Fact]
-            public void ReturnsTrueWhenPathInfoStartsWithPrefix()
-            {
-                var root = new PublicFolder { Prefix = "prefix" };
-                root.ShouldRespondWithFile(
-                    Mocks.HttpContext(new Dictionary<string, object> {{"PathInfo", "/prefix/index.html"}}))
-                    .ShouldBeTrue();
             }
         }
     }

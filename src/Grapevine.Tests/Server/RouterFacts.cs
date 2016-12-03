@@ -831,19 +831,19 @@ namespace Grapevine.Tests.Server
             [Fact]
             public void ReturnsTrueWhenContextHasBeenRespondedTo()
             {
+                var context = Mocks.HttpContext();
                 var executed = false;
-                var route = new Route(ctx => { executed = true; return ctx; });
 
-                var context = Substitute.For<IHttpContext>();
-                context.WasRespondedTo.Returns(true);
+                var route = new Route(ctx =>
+                {
+                    executed = true;
+                    context.WasRespondedTo.Returns(true);
+                    return ctx;
+                });
 
-                var router = new Router();
-                IList<IRoute> routing = new List<IRoute>();
-                routing.Add(route);
+                new Router().Route(context, new List<IRoute> { route });
 
-                router.Route(context, routing);
-
-                executed.ShouldBeFalse();
+                executed.ShouldBeTrue();
             }
         }
 

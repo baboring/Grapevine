@@ -3,8 +3,9 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
+using Grapevine.Exceptions.Server;
 using Grapevine.Interfaces.Server;
+using FileNotFoundException = Grapevine.Exceptions.Server.FileNotFoundException;
 
 namespace Grapevine.Server
 {
@@ -30,19 +31,19 @@ namespace Grapevine.Server
         /// </summary>
         /// <param name="context"></param>
         /// <returns></returns>
-        IHttpContext UploadFile(IHttpContext context);
+        //void UploadFile(IHttpContext context);
 
         /// <summary>
         /// Send file
         /// </summary>
         /// <param name="context"></param>
         /// <returns></returns>
-        IHttpContext SendFile(IHttpContext context);
+        void SendFile(IHttpContext context);
     }
 
     public class PublicFolder : IPublicFolder
     {
-        protected ConcurrentDictionary<string, string> DirectoryList;
+        protected ConcurrentDictionary<string, string> DirectoryList = new ConcurrentDictionary<string, string>();
         protected const string DefaultFolderName = "public";
         protected FileSystemWatcher Watcher;
 
@@ -53,16 +54,15 @@ namespace Grapevine.Server
 
         public PublicFolder() : this(Path.Combine(Directory.GetCurrentDirectory(), DefaultFolderName)) { }
 
-        public PublicFolder(string path)
-        {
-            Initialize(path);
-        }
+        public PublicFolder(string path) : this(path, string.Empty) { }
 
-        private void Initialize(string path)
+        public PublicFolder(string path, string prefix)
         {
             FolderPath = Path.GetFullPath(path);
             if (ExistingPublicFolders.Contains(FolderPath)) throw new Exception();
             ExistingPublicFolders.Add(FolderPath);
+
+            _prefix = prefix;
 
             Watcher = new FileSystemWatcher
             {
@@ -73,14 +73,11 @@ namespace Grapevine.Server
                 NotifyFilter = NotifyFilters.FileName
             };
 
-            Watcher.Changed += RefreshDirectoryList;
-            Watcher.Created += RefreshDirectoryList;
-            Watcher.Deleted += RefreshDirectoryList;
-            Watcher.Renamed += RefreshDirectoryList;
+            Watcher.Created += UpdateDirectoryList;
+            Watcher.Deleted += UpdateDirectoryList;
+            Watcher.Renamed += UpdateDirectoryList;
 
             PopulateDirectoryList();
-
-            _prefix = string.Empty;
         }
 
         public string DefaultFileName { get; set; } = "index.html";
@@ -88,7 +85,14 @@ namespace Grapevine.Server
         public string Prefix
         {
             get { return _prefix; }
-            set { _prefix = string.IsNullOrWhiteSpace(value) ? string.Empty : $"/{value.Trim().TrimStart('/').TrimEnd('/').Trim()}"; }
+            set
+            {
+                var prefix = string.IsNullOrWhiteSpace(value) ? string.Empty : $"/{value.Trim().TrimStart('/').TrimEnd('/').Trim()}";
+                if (prefix.Equals(_prefix)) return;
+
+                _prefix = prefix;
+                PopulateDirectoryList();
+            }
         }
 
         public string FolderPath
@@ -106,27 +110,70 @@ namespace Grapevine.Server
             }
         }
 
-        public IHttpContext UploadFile(IHttpContext context)
+        //public void UploadFile(IHttpContext context)
+        //{
+        //    throw new NotImplementedException();
+        //}
+
+        public void SendFile(IHttpContext context)
         {
-            throw new NotImplementedException();
+            if (DirectoryList.ContainsKey(context.Request.PathInfo))
+            {
+                context.Response.SendResponse(DirectoryList[context.Request.PathInfo], true);
+            }
+
+            if (Prefix != null && context.Request.PathInfo.StartsWith(Prefix) && !context.WasRespondedTo)
+            {
+                throw new FileNotFoundException(context);
+            }
         }
 
-        public IHttpContext SendFile(IHttpContext context)
+        protected void UpdateDirectoryList(object source, FileSystemEventArgs args)
         {
-            throw new NotImplementedException();
-        }
+            switch (args.ChangeType)
+            {
+                case WatcherChangeTypes.Created:
+                    AddToDirectoryList(args.FullPath);
+                    break;
+                case WatcherChangeTypes.Deleted:
+                    RemoveFromDirectoryList(args.FullPath);
+                    break;
+                case WatcherChangeTypes.Renamed:
+                    AddToDirectoryList(args.FullPath);
+                    RemoveFromDirectoryList((args as RenamedEventArgs)?.OldFullPath);
+                    break;
+            }
 
-        protected void RefreshDirectoryList(object source, EventArgs args)
-        {
-            // Add or remove items
+            foreach (var key in DirectoryList.Keys)
+            {
+                Console.WriteLine(key);
+            }
         }
 
         protected void PopulateDirectoryList()
         {
+            DirectoryList.Clear();
             foreach (var item in Directory.GetFiles(FolderPath, "*", SearchOption.AllDirectories).ToList())
             {
-                DirectoryList[$"{Prefix}{item.Replace(FolderPath, string.Empty)}"] = item;
+                AddToDirectoryList(item);
             }
+        }
+
+        protected void AddToDirectoryList(string item)
+        {
+            if (item != null) DirectoryList[CreateDirectoryListKey(item)] = item;
+        }
+
+        protected void RemoveFromDirectoryList(string item)
+        {
+            if (item == null) return;
+            var key = CreateDirectoryListKey(item);
+            if (DirectoryList.ContainsKey(key)) DirectoryList.TryRemove(key, out key);
+        }
+
+        protected string CreateDirectoryListKey(string item)
+        {
+            return $"{Prefix}{item.Replace(FolderPath, string.Empty)}";
         }
 
         public void Dispose()

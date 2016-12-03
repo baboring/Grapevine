@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Grapevine.Server;
 using Grapevine.Shared.Loggers;
@@ -23,8 +24,9 @@ namespace Grapevine.Tests.Server
                 options.Router.ShouldNotBeNull();
                 options.Router.ShouldBeOfType<Router>();
 
+                options.PublicFolders.Any().ShouldBeFalse();
                 options.PublicFolder.ShouldNotBeNull();
-                options.PublicFolder.ShouldBeOfType<PublicFolder>();
+                options.PublicFolders.Any().ShouldBeTrue();
 
                 options.UseHttps.ShouldBeFalse();
                 options.Host.ShouldBe("localhost");
