@@ -1,6 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using Grapevine.Server;
 using Grapevine.Shared;
@@ -37,11 +38,17 @@ namespace Grapevine.Tests.Server
             [Fact]
             public void DefaultValues()
             {
-                var root = new PublicFolder();
-                root.DefaultFileName.ShouldBe("index.html");
-                root.FolderPath.EndsWith("public").ShouldBe(true);
-                root.Prefix.Equals(string.Empty).ShouldBeTrue();
+                var folder = new PublicFolder();
+                folder.DefaultFileName.ShouldBe("index.html");
+                folder.FolderPath.EndsWith("public").ShouldBeTrue();
+                folder.Prefix.Equals(string.Empty).ShouldBeTrue();
+                folder.DirectoryListing.Any().ShouldBeFalse();
             }
+
+            // no params
+            // absolute path
+            // relative path
+            // path and prefix
         }
 
         public class FolderPathProperty
@@ -53,84 +60,6 @@ namespace Grapevine.Tests.Server
                 var root = new PublicFolder(folder);
                 root.FolderPath.Equals(Path.Combine(Directory.GetCurrentDirectory(), folder)).ShouldBe(true);
                 CleanUp(root.FolderPath);
-            }
-        }
-
-        public class GetFilePathMethod
-        {
-            [Fact]
-            public void ReturnsNullWhenPathInfoIsNull()
-            {
-                var root = new PublicFolder();
-                root.FilePathGetter(null).ShouldBeNull();
-            }
-
-            [Fact]
-            public void ReturnsNullWhenPathInfoIsEmptyString()
-            {
-                var root = new PublicFolder();
-                root.FilePathGetter(string.Empty).ShouldBeNull();
-            }
-
-            [Fact]
-            public void ReturnsNullWhenPathInfoIsWhiteSpace()
-            {
-                var root = new PublicFolder();
-                root.FilePathGetter(" ").ShouldBeNull();
-            }
-
-            [Fact]
-            public void ReturnsNullWhenPathDoesNotExist()
-            {
-                var root = new PublicFolder();
-                root.FilePathGetter("/nope.txt").ShouldBeNull();
-            }
-
-            [Fact]
-            public void ReturnsNullWhenDefaultFileDoesNotExist()
-            {
-                var folder = GenerateUniqueString();
-                var root = new PublicFolder();
-
-                var folderpath = Directory.CreateDirectory(Path.Combine(root.FolderPath, folder)).FullName;
-                if (!Directory.Exists(folderpath)) throw new Exception("Folder to test did not get created");
-
-                root.FilePathGetter($"/{folder}").ShouldBeNull();
-
-                CleanUp(folderpath);
-            }
-
-            [Fact]
-            public void ReturnsExistingFilePath()
-            {
-                var root = new PublicFolder();
-                var file = GenerateUniqueString();
-
-                var filepath = Path.Combine(root.FolderPath, file);
-                using (var sw = File.CreateText(filepath)) { sw.WriteLine("Hello"); }
-
-                root.FilePathGetter(file).ShouldBe(filepath);
-                root.FilePathGetter($"/{file}").ShouldBe(filepath);
-
-                File.Delete(filepath);
-            }
-
-            [Fact]
-            public void ReturnsExistingDefaultFilePath()
-            {
-                var root = new PublicFolder();
-                var folder = GenerateUniqueString();
-
-                var folderpath = Directory.CreateDirectory(Path.Combine(root.FolderPath, folder)).FullName;
-                if (!Directory.Exists(folderpath)) throw new Exception("Folder to test did not get created");
-
-                var filepath = Path.Combine(folderpath, root.DefaultFileName);
-                using (var sw = File.CreateText(filepath)) { sw.WriteLine("Hello"); }
-
-                root.FilePathGetter(folder).ShouldBe(filepath);
-                root.FilePathGetter($"/{folder}").ShouldBe(filepath);
-
-                CleanUp(folderpath);
             }
         }
 
@@ -175,99 +104,10 @@ namespace Grapevine.Tests.Server
                 folder.Prefix.Equals("/hello").ShouldBeTrue();
             }
         }
-
-        public class RespondWithFileMethod
-        {
-            [Fact]
-            public void DoesNotSendWhenHttpVerbIsNotGetOrHead()
-            {
-                var properties = new Dictionary<string, object> { { "HttpMethod", HttpMethod.POST } };
-                var context = Mocks.HttpContext(properties);
-                var root = new PublicFolder();
-
-                root.SendFile(context);
-
-                context.Response.DidNotReceiveWithAnyArgs().SendResponse(HttpStatusCode.Ok);
-            }
-
-            [Fact]
-            public void DoesNotSendWhenPathInfoDoesNotMatchPrefix()
-            {
-                var properties = new Dictionary<string, object> { { "PathInfo", "/some/file.txt" } };
-                var context = Mocks.HttpContext(properties);
-                var root = new PublicFolder { Prefix = "test" };
-
-                root.SendFile(context);
-
-                context.Response.DidNotReceiveWithAnyArgs().SendResponse(HttpStatusCode.Ok);
-            }
-
-            [Fact]
-            public void DoesNotSendWhenFileDoesNotExist()
-            {
-                var properties = new Dictionary<string, object> { { "PathInfo", "/no/file/here" } };
-                var context = Mocks.HttpContext(properties);
-                var root = new PublicFolder();
-
-                root.SendFile(context);
-
-                context.Response.DidNotReceiveWithAnyArgs().SendResponse(HttpStatusCode.Ok);
-            }
-
-            [Fact]
-            public void SendsWhenFileExists()
-            {
-                const string folder = "sendresponse-a";
-                var root = new PublicFolder { FolderPath = Path.Combine(Directory.GetCurrentDirectory(), GenerateUniqueString()) };
-                var folderpath = Path.Combine(root.FolderPath, folder);
-                var properties = new Dictionary<string, object> { { "PathInfo", $"/{folder}" } };
-                var context = Mocks.HttpContext(properties);
-
-                // Create the directory
-                if (!Directory.Exists(folderpath)) Directory.CreateDirectory(folderpath);
-
-                // Create the required file
-                var filepath = Path.Combine(folderpath, root.DefaultFileName);
-                using (var sw = File.CreateText(filepath)) { sw.WriteLine("Hello"); }
-
-                root.SendFile(context);
-                context.Response.Received().SendResponse(filepath, true);
-
-                CleanUp(root.FolderPath);
-            }
-
-            [Fact]
-            public void SendsWhenFileExistsWithPrefix()
-            {
-                const string prefix = "prefix";
-                const string folder = "sendresponse-b";
-                var root = new PublicFolder { Prefix = prefix, FolderPath = Path.Combine(Directory.GetCurrentDirectory(), GenerateUniqueString()) };
-                var folderpath = Path.Combine(root.FolderPath, folder);
-                var properties = new Dictionary<string, object> { { "PathInfo", $"/{prefix}/{folder}" } };
-                var context = Mocks.HttpContext(properties);
-
-                // Create the directory
-                if (!Directory.Exists(folderpath)) Directory.CreateDirectory(folderpath);
-
-                // Create the required file
-                var filepath = Path.Combine(folderpath, root.DefaultFileName);
-                using (var sw = File.CreateText(filepath)) { sw.WriteLine("Hello"); }
-
-                root.SendFile(context);
-                context.Response.Received().SendResponse(filepath, true);
-
-                CleanUp(root.FolderPath);
-            }
-        }
     }
 
     public static class PublicFolderExtensions
     {
-        internal static string FilePathGetter(this PublicFolder folder, string pathInfo)
-        {
-            var memberInfo = folder.GetType();
-            var method = memberInfo?.GetMethod("GetFilePath", BindingFlags.Instance | BindingFlags.NonPublic);
-            return (string)method?.Invoke(folder, new object[] { pathInfo });
-        }
+
     }
 }

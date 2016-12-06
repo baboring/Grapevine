@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Grapevine.Exceptions.Server;
 using Grapevine.Interfaces.Server;
 using FileNotFoundException = Grapevine.Exceptions.Server.FileNotFoundException;
 
@@ -43,12 +42,10 @@ namespace Grapevine.Server
 
     public class PublicFolder : IPublicFolder
     {
-        protected ConcurrentDictionary<string, string> DirectoryList = new ConcurrentDictionary<string, string>();
+        protected ConcurrentDictionary<string, string> DirectoryList { get; set; }
         protected const string DefaultFolderName = "public";
-        protected FileSystemWatcher Watcher;
 
-        protected static IList<string> ExistingPublicFolders = new List<string>();
-
+        private FileSystemWatcher _watcher;
         private string _prefix;
         private string _path;
 
@@ -58,11 +55,9 @@ namespace Grapevine.Server
 
         public PublicFolder(string path, string prefix)
         {
+            DirectoryList = new ConcurrentDictionary<string, string>();
             FolderPath = Path.GetFullPath(path);
-            if (ExistingPublicFolders.Contains(FolderPath)) throw new Exception();
-            ExistingPublicFolders.Add(FolderPath);
-
-            _prefix = prefix;
+            Prefix = prefix;
 
             Watcher = new FileSystemWatcher
             {
@@ -109,6 +104,17 @@ namespace Grapevine.Server
                 _path = path;
             }
         }
+
+        public FileSystemWatcher Watcher
+        {
+            get { return _watcher; }
+            protected internal set
+            {
+                if (value != null) _watcher = value;
+            }
+        }
+
+        public IDictionary<string, string> DirectoryListing => DirectoryList as IDictionary<string, string>;
 
         //public void UploadFile(IHttpContext context)
         //{
@@ -178,7 +184,7 @@ namespace Grapevine.Server
 
         public void Dispose()
         {
-            Watcher.Dispose();
+            _watcher.Dispose();
         }
     }
 }
